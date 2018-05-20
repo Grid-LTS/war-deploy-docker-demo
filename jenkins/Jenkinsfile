@@ -1,0 +1,31 @@
+#!/usr/bin/env groovy
+
+pipeline {
+
+    environment {
+        DOCKER_MACHINE_IP = sh(returnStdout: true, script: '/sbin/ip route | head -n1 | cut -d" " -f3').trim()
+    }
+
+    agent {
+        dockerfile {
+             dir 'jenkins'
+             args '-v $HOME/.m2:/jenkins/.m2 --group-add docker -v /var/run/docker.sock:/var/run/docker.sock --name sl-with-docker'
+        }
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mvn -B -DskipTests clean package'
+            }
+        }
+        stage('Test') {
+            steps {
+
+                sh 'echo "Docker host ip: ${DOCKER_MACHINE_IP}"'
+                sh 'docker-compose -f containers/docker-compose.yml up -d'
+                sh 'mvn verify'
+            }
+        }
+    }
+}
